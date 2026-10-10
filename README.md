@@ -10,3 +10,18 @@ When the paste target is an image file, the areas inside that image are split as
 - Paste a piece into another image, a Word document, Paint, or a similar program.
 - Split the destination image too, so the pasted fragment becomes part of that picture's pieces.
 - Resize the fragment, place it anywhere, and put it behind any image component.
+
+## Run
+
+`compose.yaml` runs SAM 2.1 (`facebook/sam2.1-hiera-small`, Apache-2.0) through `transformers` (Apache-2.0). PyTorch and torchvision are BSD-3, because that is the runtime SAM 2 uses. Pillow is MIT-CMU.
+
+```bash
+docker compose up --build
+docker compose cp photo.png sam2:/images/in/photo.png
+```
+
+The service must be up before the copy. The first start downloads the model. Pieces are written in the `images` volume at `out/<image-name>/`. `000.png` is the largest region and sits behind the later pieces.
+
+```bash
+docker compose cp sam2:/images/out/photo ./photo-pieces
+```
