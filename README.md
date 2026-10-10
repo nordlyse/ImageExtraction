@@ -11,9 +11,21 @@ When the paste target is an image file, the areas inside that image are split as
 - Split the destination image too, so the pasted fragment becomes part of that picture's pieces.
 - Resize the fragment, place it anywhere, and put it behind any image component.
 
+## Licences
+
+| Tool | Version | Licence |
+| --- | --- | --- |
+| SAM 2.1 (`facebook/sam2.1-hiera-small`) | — | Apache-2.0 |
+| transformers | 5.19.0 | Apache-2.0 |
+| torch | 2.14.1 | BSD-3-Clause |
+| torchvision | 0.29.1 | BSD-3-Clause |
+| Pillow | 12.3.0 | MIT-CMU |
+
+SAM 2.1 runs on PyTorch. `torch` and `torchvision` are BSD-3-Clause for that reason.
+
 ## Run
 
-`compose.yaml` runs SAM 2.1 (`facebook/sam2.1-hiera-small`, Apache-2.0) through `transformers` (Apache-2.0). PyTorch and torchvision are BSD-3, because that is the runtime SAM 2 uses. Pillow is MIT-CMU.
+`compose.yaml` runs the SAM 2.1 service.
 
 ```bash
 docker compose up --build
