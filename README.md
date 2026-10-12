@@ -20,12 +20,19 @@ When the paste target is an image file, the areas inside that image are split as
 | torch | 2.14.1 | BSD-3-Clause |
 | torchvision | 0.29.1 | BSD-3-Clause |
 | Pillow | 12.3.0 | MIT-CMU |
+| Caddy | 2.10.2 | Apache-2.0 |
 
-SAM 2.1 runs on PyTorch. `torch` and `torchvision` are BSD-3-Clause for that reason.
+SAM 2.1 runs on PyTorch. `torch` and `torchvision` are BSD-3-Clause for that reason. The page layout is from FaceFlower (MIT).
 
 ## Run
 
-`compose.yaml` runs the SAM 2.1 service.
+`compose.yaml` runs the SAM 2.1 service and the page that opens two photos.
+
+```bash
+docker compose up web
+```
+
+Open http://localhost:8090. Each pane opens its own photo.
 
 ```bash
 docker compose up --build

@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ImageExtraction</title>
+    <meta name="description" content="Open two photos side by side." />
+    <script>
+      try {
+        if (localStorage.getItem("image-extraction-theme") === "light") {
+          document.documentElement.dataset.theme = "light";
+        }
+      } catch (error) {}
+    </script>
+    <link rel="stylesheet" href="css/app.css" />
+    <link rel="icon" href="data:," />
+  </head>
+  <body>
+    <canvas id="prism-bg" class="prism-bg" aria-hidden="true"></canvas>
+
+    <header class="site-header">
+      <nav class="site-nav" aria-label="Primary">
+        <a href="#home">Home</a>
+        <a href="#about">About</a>
+        <a href="#help">Help</a>
+      </nav>
+      <ul class="social">
+        <li>
+          <button type="button" aria-label="GitHub">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M12 2C6.48 2 2 6.58 2 12.26c0 4.52 2.87 8.35 6.84 9.7.5.1.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.36 1.12 2.94.86.09-.67.35-1.12.63-1.38-2.22-.26-4.55-1.14-4.55-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.32.1-2.75 0 0 .84-.27 2.75 1.05a9.3 9.3 0 0 1 5 0c1.91-1.32 2.75-1.05 2.75-1.05.55 1.43.2 2.49.1 2.75.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.81 0 .27.18.59.69.48A10.04 10.04 0 0 0 22 12.26C22 6.58 17.52 2 12 2Z"
+              />
+            </svg>
+          </button>
+        </li>
+        <li>
+          <button type="button" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M6.5 9H3.7v11.2h2.8V9ZM5.1 3.8A1.7 1.7 0 1 0 5.1 7a1.7 1.7 0 0 0 0-3.2ZM20.3 20.2h-2.8v-5.8c0-1.6-.6-2.6-2-2.6-1 0-1.6.7-1.9 1.4-.1.2-.1.6-.1.9v6.1H10.7s.04-9.9 0-11.2h2.8v1.8c.4-.6 1.1-1.5 2.8-1.5 2 0 3.6 1.3 3.6 4.2v6.7Z"
+              />
+            </svg>
+          </button>
+        </li>
+        <li>
+          <button type="button" aria-label="X">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M17.6 3H20.4L14.1 10.1 21.5 21h-5.5l-4.3-6.3L6.7 21H3.9l6.7-7.6L2.7 3h5.6l3.9 5.8L17.6 3Zm-1 16.2h1.5L7.5 4.7H5.9l10.7 14.5Z"
+              />
+            </svg>
+          </button>
+        </li>
+      </ul>
+    </header>
+
+    <main>
+      <section id="home" class="hero">
+        <div class="brand-copy">
+          <h1 class="brand-title">ImageExtraction</h1>
+          <p class="brand-tag">Open two photos side by side.</p>
+        </div>
+        <div class="hero-tools">
+          <p id="engine-status" class="chip" data-state="ready">Ready</p>
+          <div class="theme-switch" role="group" aria-label="Appearance">
+            <button type="button" id="theme-light-button" aria-pressed="false" aria-label="Light mode">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="4" fill="currentColor" />
+                <path
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-linecap="round"
+                  stroke-width="1.8"
+                  d="M12 3v2M12 19v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M3 12h2M19 12h2M4.9 19.1l1.4-1.4M17.7 6.3 19.1 4.9"
+                />
+              </svg>
+            </button>
+            <button type="button" id="theme-dark-button" aria-pressed="true" aria-label="Dark mode">
+              <svg viewBox="0 0 24 24" aria-hidden="true">
+                <path
+                  fill="currentColor"
+                  d="M16.4 3.6a8.2 8.2 0 1 0 4 13.1 7.1 7.1 0 0 1-9.3-9.7 8 8 0 0 0 5.3-3.4Z"
+                />
+              </svg>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <section class="board">
+        <article class="card" id="left-card">
+          <div class="card-head">
+            <h2>First image</h2>
+            <button type="button" id="left-open" class="btn btn-ghost">Open</button>
+          </div>
+          <div class="frame" id="left-frame">
+            <canvas id="left-canvas" hidden></canvas>
+            <div id="left-placeholder" class="placeholder">
+              <strong>Drop a photo here</strong>
+              <span>or press Open. JPEG, PNG, and WebP work best.</span>
+            </div>
+          </div>
+          <p id="left-status" class="pane-status" role="status"></p>
+        </article>
+
+        <article class="card" id="right-card">
+          <div class="card-head">
+            <h2>Second image</h2>
+            <button type="button" id="right-open" class="btn btn-ghost">Open</button>
+          </div>
+          <div class="frame" id="right-frame">
+            <canvas id="right-canvas" hidden></canvas>
+            <div id="right-placeholder" class="placeholder">
+              <strong>Drop a photo here</strong>
+              <span>or press Open. JPEG, PNG, and WebP work best.</span>
+            </div>
+          </div>
+          <p id="right-status" class="pane-status" role="status"></p>
+        </article>
+      </section>
+
+      <section id="about" class="page-section">
+        <article class="card" id="about-card">
+          <div class="card-head">
+            <h2>About</h2>
+          </div>
+          <p class="page-copy">
+            ImageExtraction opens two photos side by side. Each pane keeps its own picture.
+            Nothing is sent to a server.
+          </p>
+        </article>
+      </section>
+
+      <section id="help" class="page-section">
+        <article class="card" id="help-card">
+          <div class="card-head">
+            <h2>Help</h2>
+          </div>
+          <p class="page-copy">
+            Press Open on a pane, or drop a JPEG, PNG, or WebP photo onto that pane. The other
+            pane stays as it is. Opening a new photo in a pane replaces only that pane.
+          </p>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <nav class="site-nav" aria-label="Footer">
+        <a href="#home">Home</a>
+        <a href="#about">About</a>
+        <a href="#help">Help</a>
+      </nav>
+      <ul class="social">
+        <li>
+          <button type="button" aria-label="GitHub">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M12 2C6.48 2 2 6.58 2 12.26c0 4.52 2.87 8.35 6.84 9.7.5.1.68-.22.68-.48 0-.24-.01-.87-.01-1.7-2.78.62-3.37-1.37-3.37-1.37-.45-1.18-1.11-1.5-1.11-1.5-.91-.64.07-.63.07-.63 1 .07 1.53 1.06 1.53 1.06.9 1.57 2.36 1.12 2.94.86.09-.67.35-1.12.63-1.38-2.22-.26-4.55-1.14-4.55-5.07 0-1.12.39-2.03 1.03-2.75-.1-.26-.45-1.32.1-2.75 0 0 .84-.27 2.75 1.05a9.3 9.3 0 0 1 5 0c1.91-1.32 2.75-1.05 2.75-1.05.55 1.43.2 2.49.1 2.75.64.72 1.03 1.63 1.03 2.75 0 3.94-2.34 4.8-4.57 5.06.36.32.68.94.68 1.9 0 1.37-.01 2.48-.01 2.81 0 .27.18.59.69.48A10.04 10.04 0 0 0 22 12.26C22 6.58 17.52 2 12 2Z"
+              />
+            </svg>
+          </button>
+        </li>
+        <li>
+          <button type="button" aria-label="LinkedIn">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M6.5 9H3.7v11.2h2.8V9ZM5.1 3.8A1.7 1.7 0 1 0 5.1 7a1.7 1.7 0 0 0 0-3.2ZM20.3 20.2h-2.8v-5.8c0-1.6-.6-2.6-2-2.6-1 0-1.6.7-1.9 1.4-.1.2-.1.6-.1.9v6.1H10.7s.04-9.9 0-11.2h2.8v1.8c.4-.6 1.1-1.5 2.8-1.5 2 0 3.6 1.3 3.6 4.2v6.7Z"
+              />
+            </svg>
+          </button>
+        </li>
+        <li>
+          <button type="button" aria-label="X">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path
+                fill="currentColor"
+                d="M17.6 3H20.4L14.1 10.1 21.5 21h-5.5l-4.3-6.3L6.7 21H3.9l6.7-7.6L2.7 3h5.6l3.9 5.8L17.6 3Zm-1 16.2h1.5L7.5 4.7H5.9l10.7 14.5Z"
+              />
+            </svg>
+          </button>
+        </li>
+      </ul>
+    </footer>
+    <p class="credit shiny-text">Page layout from FaceFlower (MIT). Nothing is sent to a server.</p>
+
+    <input id="left-file" type="file" accept="image/*" hidden />
+    <input id="right-file" type="file" accept="image/*" hidden />
+
+    <script src="js/prism-bg.js"></script>
+    <script src="js/app.js"></script>
+  </body>
+</html>
