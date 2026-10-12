@@ -745,3 +745,44 @@ canvas[hidden],
   min-height: 1.2em;
   font-size: 0.9rem;
 }
+
+.piece-menu {
+  position: fixed;
+  z-index: 20;
+  min-width: 140px;
+  padding: 6px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.94);
+  box-shadow: var(--shadow);
+}
+
+.piece-menu[hidden] {
+  display: none !important;
+}
+
+.piece-menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.piece-menu button:hover:not(:disabled),
+.piece-menu button:focus-visible:not(:disabled) {
+  background: rgba(196, 69, 77, 0.12);
+  color: var(--rose);
+  outline: none;
+}
+
+.piece-menu button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}

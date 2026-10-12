@@ -26,7 +26,7 @@ SAM 2.1 runs on PyTorch. `torch` and `torchvision` are BSD-3-Clause for that rea
 
 ## Web UI
 
-The page is the place to open the two photos this program works on. One pane holds the source picture, the other holds the picture you paste pieces into. Each pane keeps its own photo, and a new photo replaces only that pane. Nothing on the page is sent to a server. The layout comes from FaceFlower (MIT).
+The page opens the two photos this program works on. After a photo opens, the page sends it to the SAM service, which returns one piece per component. Right-click a piece and choose Copy. On the other photo, click the place you want, then right-click and choose Paste. The piece is placed with its center on that point. There is no resize step yet. The layout comes from FaceFlower (MIT).
 
 Start it with:
 
@@ -36,7 +36,7 @@ docker compose up web
 
 Then open [http://localhost:8090](http://localhost:8090). The host port is **8090**. Inside the container, Caddy serves the page on port 80.
 
-Press **Open** on a pane, or drop a JPEG, PNG, or WebP photo onto that pane.
+Press **Open** on a pane, or drop a JPEG, PNG, or WebP photo onto that pane. The first split waits until SAM has loaded. Caddy forwards `/api/segment` to the SAM service.
 
 ## Run the splitter
 

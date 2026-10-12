@@ -11,111 +11,7 @@ services:
         FROM python:3.12-slim-bookworm
         RUN pip install --no-cache-dir torch==2.14.1 torchvision==0.29.1 transformers==5.19.0 pillow==12.3.0
         WORKDIR /opt/image-extraction
-        COPY <<'PY' /opt/image-extraction/split_image.py
-        import time
-        from pathlib import Path
-
-        import numpy as np
-        import torch
-        from PIL import Image
-        from transformers import pipeline
-
-        MODEL = "facebook/sam2.1-hiera-small"
-        IN_DIR = Path("/images/in")
-        OUT_DIR = Path("/images/out")
-        SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
-
-
-        def mask_alpha(mask, size):
-            if isinstance(mask, Image.Image):
-                alpha = mask.convert("L")
-            else:
-                if isinstance(mask, torch.Tensor):
-                    array = mask.detach().cpu().numpy()
-                else:
-                    array = np.asarray(mask)
-                array = np.squeeze(array)
-                if array.dtype == np.bool_:
-                    array = array.astype(np.uint8) * 255
-                else:
-                    array = (array > 0.5).astype(np.uint8) * 255
-                alpha = Image.fromarray(array, mode="L")
-            if alpha.size != size:
-                alpha = alpha.resize(size, Image.Resampling.NEAREST)
-            return alpha
-
-
-        def masks_of(outputs):
-            masks = outputs["masks"]
-            if isinstance(masks, torch.Tensor):
-                if masks.ndim == 2:
-                    return [masks]
-                return [masks[index] for index in range(masks.shape[0])]
-            if isinstance(masks, np.ndarray) and masks.ndim >= 3:
-                return [masks[index] for index in range(masks.shape[0])]
-            return list(masks)
-
-
-        def write_pieces(path, generator):
-            image = Image.open(path).convert("RGBA")
-            outputs = generator(image.convert("RGB"), points_per_batch=64)
-            pieces = []
-            for mask in masks_of(outputs):
-                alpha = mask_alpha(mask, image.size)
-                pieces.append((int(np.array(alpha).sum()), alpha))
-            pieces.sort(key=lambda item: item[0], reverse=True)
-            target = OUT_DIR / path.stem
-            target.mkdir(parents=True, exist_ok=True)
-            for old in target.glob("*.png"):
-                old.unlink()
-            for index, (_, alpha) in enumerate(pieces):
-                piece = image.copy()
-                piece.putalpha(alpha)
-                piece.save(target / f"{index:03d}.png")
-            print(f"Split {path.name} into {len(pieces)} pieces", flush=True)
-
-
-        def stable_images(seen):
-            ready = []
-            for path in sorted(IN_DIR.iterdir()):
-                if not path.is_file() or path.suffix.lower() not in SUFFIXES:
-                    continue
-                stat = path.stat()
-                key = (stat.st_mtime_ns, stat.st_size)
-                if seen.get(path.name) == key:
-                    continue
-                time.sleep(0.3)
-                stat_again = path.stat()
-                key_again = (stat_again.st_mtime_ns, stat_again.st_size)
-                if key_again != key:
-                    continue
-                ready.append((path, key_again))
-            return ready
-
-
-        def main():
-            IN_DIR.mkdir(parents=True, exist_ok=True)
-            OUT_DIR.mkdir(parents=True, exist_ok=True)
-            device = 0 if torch.cuda.is_available() else -1
-            print(f"Loading {MODEL}", flush=True)
-            generator = pipeline("mask-generation", model=MODEL, device=device)
-            Path("/tmp/sam2-ready").write_text("ok\n")
-            print(f"Watching {IN_DIR}", flush=True)
-            seen = {}
-            while True:
-                for path, key in stable_images(seen):
-                    try:
-                        write_pieces(path, generator)
-                    except Exception as error:
-                        print(f"Could not split {path.name}: {error}", flush=True)
-                        continue
-                    seen[path.name] = key
-                time.sleep(2)
-
-
-        if __name__ == "__main__":
-            main()
-        PY
+        COPY sam/split_image.py /opt/image-extraction/split_image.py
         ENV PYTHONUNBUFFERED=1 HF_HOME=/models HF_HUB_DISABLE_TELEMETRY=1
         CMD ["python", "/opt/image-extraction/split_image.py"]
     environment:
@@ -132,13 +28,16 @@ services:
       retries: 20
       start_period: 300s
 
-  # Caddy is Apache-2.0.
+  # Caddy is Apache-2.0. It proxies /api to the SAM service.
   web:
     image: caddy:2.10.2-alpine
+    depends_on:
+      - sam2
     ports:
       - "8090:80"
     volumes:
       - ./web:/usr/share/caddy:ro
+      - ./web/Caddyfile:/etc/caddy/Caddyfile:ro
 
 volumes:
   images:
