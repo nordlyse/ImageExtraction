@@ -24,15 +24,23 @@ When the paste target is an image file, the areas inside that image are split as
 
 SAM 2.1 runs on PyTorch. `torch` and `torchvision` are BSD-3-Clause for that reason. The page layout is from FaceFlower (MIT).
 
-## Run
+## Web UI
 
-`compose.yaml` runs the SAM 2.1 service and the page that opens two photos.
+The page is the place to open the two photos this program works on. One pane holds the source picture, the other holds the picture you paste pieces into. Each pane keeps its own photo, and a new photo replaces only that pane. Nothing on the page is sent to a server. The layout comes from FaceFlower (MIT).
+
+Start it with:
 
 ```bash
 docker compose up web
 ```
 
-Open http://localhost:8090. Each pane opens its own photo.
+Then open [http://localhost:8090](http://localhost:8090). The host port is **8090**. Inside the container, Caddy serves the page on port 80.
+
+Press **Open** on a pane, or drop a JPEG, PNG, or WebP photo onto that pane.
+
+## Run the splitter
+
+`compose.yaml` also runs the SAM 2.1 service, which splits an image into pieces.
 
 ```bash
 docker compose up --build
