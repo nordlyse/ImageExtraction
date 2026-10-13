@@ -1,15 +1,15 @@
 # ImageExtraction
 
-ImageExtraction takes any uploaded image and splits the areas inside it into separate pieces. A piece can be copied and pasted into another open image, or into another program such as Word or Paint.
+ImageExtraction opens two photos and splits each one into pieces. A piece can be copied onto the other photo, then enlarged, shrunk, or deleted.
 
-When the paste target is an image file, the areas inside that image are split as well. A fragment copied earlier can then be enlarged or reduced, moved to any place in the picture, and tucked behind a chosen image component.
+The pasted piece is placed with its center on the point you click. Enlarge and Shrink each change the size by a quarter and keep that center.
 
 ## What it is for
 
-- Split the regions of an uploaded image into pieces that can be copied on their own.
-- Paste a piece into another image, a Word document, Paint, or a similar program.
-- Split the destination image too, so the pasted fragment becomes part of that picture's pieces.
-- Resize the fragment, place it anywhere, and put it behind any image component.
+- Split each opened photo into pieces that can be copied on their own.
+- Paste a piece onto the other photo at the point you click.
+- Enlarge or shrink the pasted piece, still centered on that point.
+- Delete a piece from the photo.
 
 ## Licences
 
@@ -26,7 +26,11 @@ SAM 2.1 runs on PyTorch. `torch` and `torchvision` are BSD-3-Clause for that rea
 
 ## Web UI
 
-The page opens the two photos this program works on. After a photo opens, the page sends it to the SAM service, which returns one piece per component. Right-click a piece and choose Copy. On the other photo, click the place you want, then right-click and choose Paste. The piece is placed with its center on that point. There is no resize step yet. The layout comes from FaceFlower (MIT).
+The page opens the two photos this program works on. After a photo opens, the page sends it to the SAM service, which returns one piece per component. Wait until the pane says how many pieces it found. Move over a piece to see its outline, then right-click that piece.
+
+The menu has **Copy**, **Paste**, **Enlarge**, **Shrink**, and **Delete**. Copy, Enlarge, Shrink, and Delete stay off until the pointer is on a piece. Paste stays off until a piece has been copied.
+
+On the other photo, click the place you want, then right-click and choose Paste. Right-click the pasted piece and choose Enlarge or Shrink. Each step changes the size by a quarter, and the piece stays centered. Delete removes the piece from the photo. The layout comes from FaceFlower (MIT).
 
 Start it with:
 
