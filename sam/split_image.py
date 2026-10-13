@@ -51,7 +51,12 @@ def masks_of(outputs):
 
 def split_rgba(image):
     with LOCK:
-        outputs = GENERATOR(image.convert("RGB"), points_per_batch=64)
+        outputs = GENERATOR(
+            image.convert("RGB"),
+            points_per_batch=64,
+            points_per_crop=16,
+        )
+    image_area = image.size[0] * image.size[1]
     pieces = []
     for mask in masks_of(outputs):
         alpha = mask_alpha(mask, image.size)
@@ -62,6 +67,8 @@ def split_rgba(image):
         rgba.putalpha(alpha)
         cropped = rgba.crop(box)
         if cropped.size[0] < 4 or cropped.size[1] < 4:
+            continue
+        if cropped.size[0] * cropped.size[1] >= image_area * 0.82:
             continue
         buffer = io.BytesIO()
         cropped.save(buffer, format="PNG")
@@ -74,13 +81,23 @@ def split_rgba(image):
                 "png": base64.b64encode(buffer.getvalue()).decode("ascii"),
             }
         )
+    pieces.sort(key=lambda item: item["width"] * item["height"], reverse=True)
+    pieces = pieces[:16]
+    print(
+        f"Split request {image.size[0]}x{image.size[1]} into {len(pieces)} pieces",
+        flush=True,
+    )
     return pieces
 
 
 def write_pieces(path):
     image = Image.open(path).convert("RGBA")
     with LOCK:
-        outputs = GENERATOR(image.convert("RGB"), points_per_batch=64)
+        outputs = GENERATOR(
+            image.convert("RGB"),
+            points_per_batch=64,
+            points_per_crop=16,
+        )
     pieces = []
     for mask in masks_of(outputs):
         alpha = mask_alpha(mask, image.size)

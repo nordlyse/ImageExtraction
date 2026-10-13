@@ -31,6 +31,7 @@ const panes = [
   pieces: [],
   point: null,
   hover: null,
+  splitting: false,
   token: 0,
 }));
 
@@ -120,17 +121,28 @@ function alphaAt(piece, x, y) {
 function pieceAt(state, point) {
   let best = null;
   let bestArea = Infinity;
+  let boxBest = null;
+  let boxArea = Infinity;
   for (const piece of state.pieces) {
-    if (alphaAt(piece, point.x, point.y) < 16) {
+    const inside =
+      point.x >= piece.x &&
+      point.y >= piece.y &&
+      point.x < piece.x + piece.width &&
+      point.y < piece.y + piece.height;
+    if (!inside) {
       continue;
     }
     const area = piece.width * piece.height;
-    if (area < bestArea) {
+    if (area < boxArea) {
+      boxBest = piece;
+      boxArea = area;
+    }
+    if (alphaAt(piece, point.x, point.y) >= 16 && area < bestArea) {
       best = piece;
       bestArea = area;
     }
   }
-  return best;
+  return best || boxBest;
 }
 
 function loadPiece(raw) {
@@ -156,6 +168,8 @@ function loadPiece(raw) {
   });
 }
 
+let menuShownAt = 0;
+
 function hideMenu() {
   pieceMenu.hidden = true;
   menuPane = null;
@@ -163,12 +177,18 @@ function hideMenu() {
 }
 
 function showMenu(event, state, point) {
+  menuShownAt = performance.now();
   menuPane = state;
   menuPoint = point;
   state.hover = pieceAt(state, point);
   paintView(state);
   copyButton.disabled = !state.hover;
   pasteButton.disabled = !clipboard;
+  if (!state.hover) {
+    state.node.status.textContent = state.splitting
+      ? "Still splitting. Copy turns on when the piece count appears."
+      : "Right-click the object itself to copy it.";
+  }
   pieceMenu.hidden = false;
   const margin = 8;
   const width = pieceMenu.offsetWidth;
@@ -179,14 +199,37 @@ function showMenu(event, state, point) {
   pieceMenu.style.top = `${Math.max(margin, top)}px`;
 }
 
+function endSplit(state, token, text) {
+  if (token !== state.token) {
+    return;
+  }
+  state.splitting = false;
+  state.node.status.textContent = text;
+}
+
 async function splitPane(state) {
   const token = state.token + 1;
   state.token = token;
   state.pieces = [];
   state.hover = null;
+  state.splitting = true;
   paintView(state);
   state.node.status.textContent = "Splitting image...";
-  const blob = await new Promise((resolve) => state.node.canvas.toBlob(resolve, "image/png"));
+  let blob;
+  try {
+    blob = await new Promise((resolve, reject) => {
+      state.node.canvas.toBlob((value) => {
+        if (value) {
+          resolve(value);
+        } else {
+          reject(new Error("blob"));
+        }
+      }, "image/png");
+    });
+  } catch (error) {
+    endSplit(state, token, "Could not split this image.");
+    return;
+  }
   if (token !== state.token) {
     return;
   }
@@ -196,21 +239,30 @@ async function splitPane(state) {
       method: "POST",
       headers: { "Content-Type": "image/png" },
       body: blob,
+      signal: AbortSignal.timeout(180000),
     });
   } catch (error) {
-    if (token === state.token) {
-      state.node.status.textContent = "SAM is not ready yet.";
-    }
+    endSplit(
+      state,
+      token,
+      error.name === "TimeoutError" ? "Split took too long. Try a smaller photo." : "SAM is not ready yet."
+    );
     return;
   }
   if (token !== state.token) {
     return;
   }
   if (!response.ok) {
-    state.node.status.textContent = response.status === 503 ? "SAM is still loading." : "Could not split this image.";
+    endSplit(state, token, response.status === 503 ? "SAM is still loading." : "Could not split this image.");
     return;
   }
-  const payload = await response.json();
+  let payload;
+  try {
+    payload = await response.json();
+  } catch (error) {
+    endSplit(state, token, "Could not split this image.");
+    return;
+  }
   const loaded = [];
   for (const raw of payload.pieces || []) {
     try {
@@ -223,7 +275,7 @@ async function splitPane(state) {
     return;
   }
   state.pieces = loaded;
-  state.node.status.textContent = `Image open. ${loaded.length} pieces.`;
+  endSplit(state, token, `Image open. ${loaded.length} pieces.`);
 }
 
 function pastePiece(state, point) {
@@ -255,7 +307,7 @@ function openPhoto(state, file) {
         return;
       }
       const canvas = state.node.canvas;
-      const scale = Math.min(1, 1600 / Math.max(bitmap.width, bitmap.height));
+      const scale = Math.min(1, 1024 / Math.max(bitmap.width, bitmap.height));
       canvas.width = Math.max(1, Math.round(bitmap.width * scale));
       canvas.height = Math.max(1, Math.round(bitmap.height * scale));
       canvas.getContext("2d").drawImage(bitmap, 0, 0, canvas.width, canvas.height);
@@ -330,12 +382,16 @@ function bindPane(state) {
     }
     state.point = canvasPoint(canvas, event);
   });
-  canvas.addEventListener("contextmenu", (event) => {
+  frame.addEventListener("contextmenu", (event) => {
     if (!state.base) {
       return;
     }
     event.preventDefault();
-    showMenu(event, state, canvasPoint(canvas, event));
+    const point =
+      event.target === canvas
+        ? canvasPoint(canvas, event)
+        : state.point || { x: canvas.width / 2, y: canvas.height / 2 };
+    showMenu(event, state, point);
   });
 }
 
@@ -379,6 +435,9 @@ function startApp() {
   });
   document.addEventListener("pointerdown", (event) => {
     if (pieceMenu.hidden || pieceMenu.contains(event.target)) {
+      return;
+    }
+    if (event.button === 2 || performance.now() - menuShownAt < 500) {
       return;
     }
     hideMenu();
