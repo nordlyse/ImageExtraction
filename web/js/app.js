@@ -3,6 +3,8 @@ const themeDarkButton = document.getElementById("theme-dark-button");
 const pieceMenu = document.getElementById("piece-menu");
 const copyButton = document.getElementById("copy-piece");
 const pasteButton = document.getElementById("paste-piece");
+const enlargeButton = document.getElementById("enlarge-piece");
+const shrinkButton = document.getElementById("shrink-piece");
 const deleteButton = document.getElementById("delete-piece");
 const THEME_KEY = "image-extraction-theme";
 
@@ -183,13 +185,16 @@ function showMenu(event, state, point) {
   menuPoint = point;
   state.hover = pieceAt(state, point);
   paintView(state);
-  copyButton.disabled = !state.hover;
+  const noPiece = !state.hover;
+  copyButton.disabled = noPiece;
   pasteButton.disabled = !clipboard;
-  deleteButton.disabled = !state.hover;
-  if (!state.hover) {
+  enlargeButton.disabled = noPiece;
+  shrinkButton.disabled = noPiece;
+  deleteButton.disabled = noPiece;
+  if (noPiece) {
     state.node.status.textContent = state.splitting
-      ? "Still splitting. Copy and Delete turn on when the piece count appears."
-      : "Right-click the object itself to copy or delete it.";
+      ? "Still splitting. Copy, Enlarge, Shrink, and Delete turn on when the piece count appears."
+      : "Right-click the object itself to copy, resize, or delete it.";
   }
   pieceMenu.hidden = false;
   const margin = 8;
@@ -296,6 +301,60 @@ function deletePiece(state) {
   state.node.status.textContent = "Deleted.";
 }
 
+const RESIZE_STEP = 1.25;
+
+function resizePiece(state, factor) {
+  const piece = state.hover;
+  if (!piece || !state.base) {
+    return;
+  }
+  const width = Math.round(piece.width * factor);
+  const height = Math.round(piece.height * factor);
+  const limit = Math.max(state.node.canvas.width, state.node.canvas.height) * 3;
+  if (width < 8 || height < 8) {
+    state.node.status.textContent = "That piece is already small.";
+    return;
+  }
+  if (width > limit || height > limit) {
+    state.node.status.textContent = "That piece is already large.";
+    return;
+  }
+  const scratch = document.createElement("canvas");
+  scratch.width = width;
+  scratch.height = height;
+  const scratchCtx = scratch.getContext("2d");
+  scratchCtx.imageSmoothingEnabled = true;
+  scratchCtx.drawImage(piece.image, 0, 0, width, height);
+  const x = Math.round(piece.x + piece.width / 2 - width / 2);
+  const y = Math.round(piece.y + piece.height / 2 - height / 2);
+  const base = state.base.getContext("2d");
+  base.save();
+  base.globalCompositeOperation = "destination-out";
+  base.drawImage(piece.image, piece.x, piece.y);
+  base.restore();
+  base.drawImage(scratch, x, y);
+  const next = {
+    x,
+    y,
+    width,
+    height,
+    image: scratch,
+    data: scratchCtx.getImageData(0, 0, width, height).data,
+  };
+  const index = state.pieces.indexOf(piece);
+  if (index >= 0) {
+    state.pieces[index] = next;
+  } else {
+    state.pieces.push(next);
+  }
+  if (clipboard === piece) {
+    clipboard = next;
+  }
+  state.hover = next;
+  paintView(state);
+  state.node.status.textContent = factor > 1 ? "Enlarged." : "Shrunk.";
+}
+
 function pastePiece(state, point) {
   if (!clipboard || !state.base) {
     return;
@@ -303,10 +362,18 @@ function pastePiece(state, point) {
   const x = Math.round(point.x - clipboard.width / 2);
   const y = Math.round(point.y - clipboard.height / 2);
   state.base.getContext("2d").drawImage(clipboard.image, x, y);
-  state.hover = null;
+  const pasted = {
+    x,
+    y,
+    width: clipboard.width,
+    height: clipboard.height,
+    image: clipboard.image,
+    data: clipboard.data,
+  };
+  state.pieces.push(pasted);
+  state.hover = pasted;
   paintView(state);
   state.node.status.textContent = "Pasted.";
-  splitPane(state);
 }
 
 function openPhoto(state, file) {
@@ -450,6 +517,18 @@ function startApp() {
     }
     pastePiece(menuPane, menuPane.point || menuPoint);
     hideMenu();
+  });
+  enlargeButton.addEventListener("click", () => {
+    if (!menuPane || !menuPane.hover) {
+      return;
+    }
+    resizePiece(menuPane, RESIZE_STEP);
+  });
+  shrinkButton.addEventListener("click", () => {
+    if (!menuPane || !menuPane.hover) {
+      return;
+    }
+    resizePiece(menuPane, 1 / RESIZE_STEP);
   });
   deleteButton.addEventListener("click", () => {
     if (!menuPane || !menuPane.hover) {
