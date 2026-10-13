@@ -3,6 +3,7 @@ const themeDarkButton = document.getElementById("theme-dark-button");
 const pieceMenu = document.getElementById("piece-menu");
 const copyButton = document.getElementById("copy-piece");
 const pasteButton = document.getElementById("paste-piece");
+const deleteButton = document.getElementById("delete-piece");
 const THEME_KEY = "image-extraction-theme";
 
 const panes = [
@@ -184,10 +185,11 @@ function showMenu(event, state, point) {
   paintView(state);
   copyButton.disabled = !state.hover;
   pasteButton.disabled = !clipboard;
+  deleteButton.disabled = !state.hover;
   if (!state.hover) {
     state.node.status.textContent = state.splitting
-      ? "Still splitting. Copy turns on when the piece count appears."
-      : "Right-click the object itself to copy it.";
+      ? "Still splitting. Copy and Delete turn on when the piece count appears."
+      : "Right-click the object itself to copy or delete it.";
   }
   pieceMenu.hidden = false;
   const margin = 8;
@@ -276,6 +278,22 @@ async function splitPane(state) {
   }
   state.pieces = loaded;
   endSplit(state, token, `Image open. ${loaded.length} pieces.`);
+}
+
+function deletePiece(state) {
+  const piece = state.hover;
+  if (!piece || !state.base) {
+    return;
+  }
+  const ctx = state.base.getContext("2d");
+  ctx.save();
+  ctx.globalCompositeOperation = "destination-out";
+  ctx.drawImage(piece.image, piece.x, piece.y);
+  ctx.restore();
+  state.pieces = state.pieces.filter((item) => item !== piece);
+  state.hover = null;
+  paintView(state);
+  state.node.status.textContent = "Deleted.";
 }
 
 function pastePiece(state, point) {
@@ -431,6 +449,13 @@ function startApp() {
       return;
     }
     pastePiece(menuPane, menuPane.point || menuPoint);
+    hideMenu();
+  });
+  deleteButton.addEventListener("click", () => {
+    if (!menuPane || !menuPane.hover) {
+      return;
+    }
+    deletePiece(menuPane);
     hideMenu();
   });
   document.addEventListener("pointerdown", (event) => {

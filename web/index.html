@@ -130,7 +130,7 @@
           </div>
           <p class="page-copy">
             ImageExtraction opens two photos side by side. SAM splits each photo into pieces.
-            Copy a piece from one photo and paste it onto the other.
+            Copy a piece from one photo and paste it onto the other, or delete that piece.
           </p>
         </article>
       </section>
@@ -143,8 +143,8 @@
           <p class="page-copy">
             Press Open on a pane, or drop a JPEG, PNG, or WebP photo onto that pane. When the
             split finishes, move over a piece to see its outline. Right-click that piece and
-            choose Copy. On the other photo, click the place you want, then right-click and
-            choose Paste. The piece is placed with its center on that point.
+            choose Copy or Delete. On the other photo, click the place you want, then
+            right-click and choose Paste. The piece is placed with its center on that point.
           </p>
         </article>
       </section>
@@ -194,12 +194,13 @@
     <div id="piece-menu" class="piece-menu" hidden>
       <button type="button" id="copy-piece">Copy</button>
       <button type="button" id="paste-piece">Paste</button>
+      <button type="button" id="delete-piece">Delete</button>
     </div>
 
     <input id="left-file" type="file" accept="image/*" hidden />
     <input id="right-file" type="file" accept="image/*" hidden />
 
     <script src="js/prism-bg.js"></script>
-    <script src="js/app.js?v=split"></script>
+    <script src="js/app.js?v=delete"></script>
   </body>
 </html>
