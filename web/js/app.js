@@ -444,22 +444,31 @@ function pastePiece(state, point) {
 
 function movePiece(state, piece, x, y) {
   if (!piece || !state.base) {
-    return;
+    return piece;
   }
+  let target = piece;
   if (!piece.floating) {
-    const ctx = state.base.getContext("2d");
-    ctx.save();
-    ctx.globalCompositeOperation = "destination-out";
-    ctx.drawImage(piece.image, piece.x, piece.y);
-    ctx.restore();
-    piece.floating = true;
+    target = {
+      x: piece.x,
+      y: piece.y,
+      width: piece.width,
+      height: piece.height,
+      image: piece.image,
+      data: piece.data,
+      floating: true,
+    };
+    state.pieces.push(target);
+    if (drag && drag.piece === piece) {
+      drag.piece = target;
+    }
   }
-  piece.x = Math.round(x);
-  piece.y = Math.round(y);
-  state.hover = piece;
+  target.x = Math.round(x);
+  target.y = Math.round(y);
+  state.hover = target;
   state.moving = null;
   paintView(state);
   state.node.status.textContent = "Moved.";
+  return target;
 }
 
 function openPhoto(state, file) {
