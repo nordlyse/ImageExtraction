@@ -3,6 +3,7 @@ const themeDarkButton = document.getElementById("theme-dark-button");
 const pieceMenu = document.getElementById("piece-menu");
 const copyButton = document.getElementById("copy-piece");
 const pasteButton = document.getElementById("paste-piece");
+const moveButton = document.getElementById("move-piece");
 const enlargeButton = document.getElementById("enlarge-piece");
 const shrinkButton = document.getElementById("shrink-piece");
 const deleteButton = document.getElementById("delete-piece");
@@ -38,6 +39,7 @@ const panes = [
   hover: null,
   splitting: false,
   fileName: "",
+  moving: null,
   token: 0,
 }));
 
@@ -106,6 +108,11 @@ function paintView(state) {
   if (state.base) {
     ctx.drawImage(state.base, 0, 0);
   }
+  for (const piece of state.pieces) {
+    if (piece.floating) {
+      ctx.drawImage(piece.image, piece.x, piece.y);
+    }
+  }
   const hover = state.hover;
   if (!hover) {
     return;
@@ -125,11 +132,20 @@ function alphaAt(piece, x, y) {
 }
 
 function pieceAt(state, point) {
+  for (let index = state.pieces.length - 1; index >= 0; index -= 1) {
+    const piece = state.pieces[index];
+    if (piece.floating && alphaAt(piece, point.x, point.y) >= 16) {
+      return piece;
+    }
+  }
   let best = null;
   let bestArea = Infinity;
   let boxBest = null;
   let boxArea = Infinity;
   for (const piece of state.pieces) {
+    if (piece.floating) {
+      continue;
+    }
     const inside =
       point.x >= piece.x &&
       point.y >= piece.y &&
@@ -175,6 +191,8 @@ function loadPiece(raw) {
 }
 
 let menuShownAt = 0;
+let drag = null;
+let skipClick = false;
 
 function hideMenu() {
   pieceMenu.hidden = true;
@@ -186,18 +204,20 @@ function showMenu(event, state, point) {
   menuShownAt = performance.now();
   menuPane = state;
   menuPoint = point;
+  state.moving = null;
   state.hover = pieceAt(state, point);
   paintView(state);
   const noPiece = !state.hover;
   copyButton.disabled = noPiece;
   pasteButton.disabled = !clipboard;
+  moveButton.disabled = noPiece;
   enlargeButton.disabled = noPiece;
   shrinkButton.disabled = noPiece;
   deleteButton.disabled = noPiece;
   if (noPiece) {
     state.node.status.textContent = state.splitting
-      ? "Still splitting. Copy, Enlarge, Shrink, and Delete turn on when the piece count appears."
-      : "Right-click the object itself to copy, resize, or delete it.";
+      ? "Still splitting. Copy, Move, Enlarge, Shrink, and Delete turn on when the piece count appears."
+      : "Right-click the object itself to copy, move, resize, or delete it.";
   }
   pieceMenu.hidden = false;
   const margin = 8;
@@ -220,8 +240,8 @@ function endSplit(state, token, text) {
 async function splitPane(state) {
   const token = state.token + 1;
   state.token = token;
-  state.pieces = [];
-  state.hover = null;
+  state.pieces = state.pieces.filter((piece) => piece.floating);
+  state.hover = state.hover && state.hover.floating ? state.hover : null;
   state.splitting = true;
   paintView(state);
   state.node.status.textContent = "Splitting image...";
@@ -284,7 +304,8 @@ async function splitPane(state) {
   if (token !== state.token) {
     return;
   }
-  state.pieces = loaded;
+  const floating = state.pieces.filter((piece) => piece.floating);
+  state.pieces = loaded.concat(floating);
   endSplit(state, token, `Image open. ${loaded.length} pieces.`);
 }
 
@@ -293,12 +314,17 @@ function deletePiece(state) {
   if (!piece || !state.base) {
     return;
   }
-  const ctx = state.base.getContext("2d");
-  ctx.save();
-  ctx.globalCompositeOperation = "destination-out";
-  ctx.drawImage(piece.image, piece.x, piece.y);
-  ctx.restore();
+  if (!piece.floating) {
+    const ctx = state.base.getContext("2d");
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.drawImage(piece.image, piece.x, piece.y);
+    ctx.restore();
+  }
   state.pieces = state.pieces.filter((item) => item !== piece);
+  if (state.moving === piece) {
+    state.moving = null;
+  }
   state.hover = null;
   paintView(state);
   state.node.status.textContent = "Deleted.";
@@ -330,12 +356,14 @@ function resizePiece(state, factor) {
   scratchCtx.drawImage(piece.image, 0, 0, width, height);
   const x = Math.round(piece.x + piece.width / 2 - width / 2);
   const y = Math.round(piece.y + piece.height / 2 - height / 2);
-  const base = state.base.getContext("2d");
-  base.save();
-  base.globalCompositeOperation = "destination-out";
-  base.drawImage(piece.image, piece.x, piece.y);
-  base.restore();
-  base.drawImage(scratch, x, y);
+  if (!piece.floating) {
+    const base = state.base.getContext("2d");
+    base.save();
+    base.globalCompositeOperation = "destination-out";
+    base.drawImage(piece.image, piece.x, piece.y);
+    base.restore();
+    base.drawImage(scratch, x, y);
+  }
   const next = {
     x,
     y,
@@ -343,6 +371,7 @@ function resizePiece(state, factor) {
     height,
     image: scratch,
     data: scratchCtx.getImageData(0, 0, width, height).data,
+    floating: Boolean(piece.floating),
   };
   const index = state.pieces.indexOf(piece);
   if (index >= 0) {
@@ -352,6 +381,9 @@ function resizePiece(state, factor) {
   }
   if (clipboard === piece) {
     clipboard = next;
+  }
+  if (state.moving === piece) {
+    state.moving = next;
   }
   state.hover = next;
   paintView(state);
@@ -363,7 +395,17 @@ function savePane(state) {
     return;
   }
   const stem = (state.fileName || "image").replace(/\.[^.]+$/, "") || "image";
-  state.base.toBlob((blob) => {
+  const flat = document.createElement("canvas");
+  flat.width = state.base.width;
+  flat.height = state.base.height;
+  const flatCtx = flat.getContext("2d");
+  flatCtx.drawImage(state.base, 0, 0);
+  for (const piece of state.pieces) {
+    if (piece.floating) {
+      flatCtx.drawImage(piece.image, piece.x, piece.y);
+    }
+  }
+  flat.toBlob((blob) => {
     if (!blob) {
       state.node.status.textContent = "Could not save this image.";
       return;
@@ -384,7 +426,6 @@ function pastePiece(state, point) {
   }
   const x = Math.round(point.x - clipboard.width / 2);
   const y = Math.round(point.y - clipboard.height / 2);
-  state.base.getContext("2d").drawImage(clipboard.image, x, y);
   const pasted = {
     x,
     y,
@@ -392,11 +433,33 @@ function pastePiece(state, point) {
     height: clipboard.height,
     image: clipboard.image,
     data: clipboard.data,
+    floating: true,
   };
   state.pieces.push(pasted);
   state.hover = pasted;
+  state.moving = null;
   paintView(state);
-  state.node.status.textContent = "Pasted.";
+  state.node.status.textContent = "Pasted. Drag the piece, or right-click and choose Move.";
+}
+
+function movePiece(state, piece, x, y) {
+  if (!piece || !state.base) {
+    return;
+  }
+  if (!piece.floating) {
+    const ctx = state.base.getContext("2d");
+    ctx.save();
+    ctx.globalCompositeOperation = "destination-out";
+    ctx.drawImage(piece.image, piece.x, piece.y);
+    ctx.restore();
+    piece.floating = true;
+  }
+  piece.x = Math.round(x);
+  piece.y = Math.round(y);
+  state.hover = piece;
+  state.moving = null;
+  paintView(state);
+  state.node.status.textContent = "Moved.";
 }
 
 function openPhoto(state, file) {
@@ -466,33 +529,84 @@ function bindPane(state) {
     const file = event.dataTransfer.files && event.dataTransfer.files[0];
     openPhoto(state, file);
   });
+  canvas.addEventListener("pointerdown", (event) => {
+    if (event.button !== 0 || !state.base) {
+      return;
+    }
+    const point = canvasPoint(canvas, event);
+    const piece = pieceAt(state, point);
+    if (!piece) {
+      return;
+    }
+    drag = {
+      state,
+      piece,
+      offsetX: point.x - piece.x,
+      offsetY: point.y - piece.y,
+      startX: point.x,
+      startY: point.y,
+      moved: false,
+    };
+    canvas.setPointerCapture(event.pointerId);
+  });
   canvas.addEventListener("pointermove", (event) => {
+    if (drag && drag.state === state) {
+      const point = canvasPoint(canvas, event);
+      const travel = Math.hypot(point.x - drag.startX, point.y - drag.startY);
+      if (!drag.moved && travel < 5) {
+        return;
+      }
+      drag.moved = true;
+      canvas.style.cursor = "grabbing";
+      movePiece(state, drag.piece, point.x - drag.offsetX, point.y - drag.offsetY);
+      return;
+    }
     if (!state.base || pieceMenu.hidden === false) {
       return;
     }
     const point = canvasPoint(canvas, event);
     const next = pieceAt(state, point);
+    canvas.style.cursor = next ? "grab" : "";
     if (next === state.hover) {
       return;
     }
     state.hover = next;
     paintView(state);
   });
-  canvas.addEventListener("pointerleave", () => {
-    if (!pieceMenu.hidden) {
+  canvas.addEventListener("pointerup", () => {
+    if (!drag || drag.state !== state) {
       return;
     }
-    if (!state.hover) {
+    if (drag.moved) {
+      skipClick = true;
+    }
+    drag = null;
+    canvas.style.cursor = "";
+  });
+  canvas.addEventListener("pointerleave", () => {
+    if ((drag && drag.state === state) || !pieceMenu.hidden || !state.hover) {
       return;
     }
     state.hover = null;
+    canvas.style.cursor = "";
     paintView(state);
   });
   canvas.addEventListener("click", (event) => {
-    if (!state.base) {
+    if (!state.base || skipClick) {
+      skipClick = false;
       return;
     }
-    state.point = canvasPoint(canvas, event);
+    const point = canvasPoint(canvas, event);
+    if (state.moving) {
+      movePiece(
+        state,
+        state.moving,
+        point.x - state.moving.width / 2,
+        point.y - state.moving.height / 2
+      );
+      return;
+    }
+    state.point = point;
   });
   frame.addEventListener("contextmenu", (event) => {
     if (!state.base) {
@@ -545,6 +659,14 @@ function startApp() {
     pastePiece(menuPane, menuPane.point || menuPoint);
     hideMenu();
   });
+  moveButton.addEventListener("click", () => {
+    if (!menuPane || !menuPane.hover) {
+      return;
+    }
+    menuPane.moving = menuPane.hover;
+    menuPane.node.status.textContent = "Click the new place.";
+    hideMenu();
+  });
   enlargeButton.addEventListener("click", () => {
     if (!menuPane || !menuPane.hover) {
       return;
@@ -576,6 +698,9 @@ function startApp() {
   window.addEventListener("keydown", (event) => {
     if (event.key === "Escape") {
       hideMenu();
+      panes.forEach((pane) => {
+        pane.moving = null;
+      });
     }
   });
 }

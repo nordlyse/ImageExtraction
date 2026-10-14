@@ -136,8 +136,8 @@
           </div>
           <p class="page-copy">
             ImageExtraction opens two photos side by side. SAM splits each photo into pieces.
-            Copy a piece from one photo and paste it onto the other. Then enlarge, shrink, or
-            delete that piece.
+            Copy a piece from one photo and paste it onto the other. Then move, enlarge, shrink,
+            or delete that piece.
           </p>
         </article>
       </section>
@@ -152,9 +152,9 @@
             split finishes, move over a piece to see its outline. Right-click that piece and
             choose Copy or Delete. On the other photo, click the place you want, then
             right-click and choose Paste. The piece is placed with its center on that point.
-            Right-click the pasted piece and choose Enlarge or Shrink. Each step changes the
-            size by a quarter, and the piece stays centered. Press Save to download that photo
-            with the changes.
+            Drag the pasted piece to a new place, or right-click it, choose Move, and click the
+            new place. Enlarge and Shrink each change the size by a quarter, and the piece
+            stays centered. Press Save to download that photo with the changes.
           </p>
         </article>
       </section>
@@ -204,6 +204,7 @@
     <div id="piece-menu" class="piece-menu" hidden>
       <button type="button" id="copy-piece">Copy</button>
       <button type="button" id="paste-piece">Paste</button>
+      <button type="button" id="move-piece">Move</button>
       <button type="button" id="enlarge-piece">Enlarge</button>
       <button type="button" id="shrink-piece">Shrink</button>
       <button type="button" id="delete-piece">Delete</button>
@@ -213,6 +214,6 @@
     <input id="right-file" type="file" accept="image/*" hidden />
 
     <script src="js/prism-bg.js"></script>
-    <script src="js/app.js?v=save"></script>
+    <script src="js/app.js?v=move"></script>
   </body>
 </html>
