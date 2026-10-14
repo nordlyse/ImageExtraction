@@ -356,14 +356,6 @@ function resizePiece(state, factor) {
   scratchCtx.drawImage(piece.image, 0, 0, width, height);
   const x = Math.round(piece.x + piece.width / 2 - width / 2);
   const y = Math.round(piece.y + piece.height / 2 - height / 2);
-  if (!piece.floating) {
-    const base = state.base.getContext("2d");
-    base.save();
-    base.globalCompositeOperation = "destination-out";
-    base.drawImage(piece.image, piece.x, piece.y);
-    base.restore();
-    base.drawImage(scratch, x, y);
-  }
   const next = {
     x,
     y,
@@ -371,19 +363,23 @@ function resizePiece(state, factor) {
     height,
     image: scratch,
     data: scratchCtx.getImageData(0, 0, width, height).data,
-    floating: Boolean(piece.floating),
+    floating: true,
   };
-  const index = state.pieces.indexOf(piece);
-  if (index >= 0) {
-    state.pieces[index] = next;
+  if (piece.floating) {
+    const index = state.pieces.indexOf(piece);
+    if (index >= 0) {
+      state.pieces[index] = next;
+    } else {
+      state.pieces.push(next);
+    }
+    if (clipboard === piece) {
+      clipboard = next;
+    }
+    if (state.moving === piece) {
+      state.moving = next;
+    }
   } else {
     state.pieces.push(next);
-  }
-  if (clipboard === piece) {
-    clipboard = next;
-  }
-  if (state.moving === piece) {
-    state.moving = next;
   }
   state.hover = next;
   paintView(state);
