@@ -12,7 +12,7 @@
         }
       } catch (error) {}
     </script>
-    <link rel="stylesheet" href="css/app.css?v=well" />
+    <link rel="stylesheet" href="css/app.css?v=save" />
     <link rel="icon" href="data:," />
   </head>
   <body>
@@ -95,7 +95,10 @@
         <article class="card" id="left-card">
           <div class="card-head">
             <h2>First image</h2>
-            <button type="button" id="left-open" class="btn btn-ghost">Open</button>
+            <div class="card-actions">
+              <button type="button" id="left-save" class="btn btn-ghost" disabled>Save</button>
+              <button type="button" id="left-open" class="btn btn-ghost">Open</button>
+            </div>
           </div>
           <div class="frame" id="left-frame">
             <canvas id="left-canvas" hidden></canvas>
@@ -110,7 +113,10 @@
         <article class="card" id="right-card">
           <div class="card-head">
             <h2>Second image</h2>
-            <button type="button" id="right-open" class="btn btn-ghost">Open</button>
+            <div class="card-actions">
+              <button type="button" id="right-save" class="btn btn-ghost" disabled>Save</button>
+              <button type="button" id="right-open" class="btn btn-ghost">Open</button>
+            </div>
           </div>
           <div class="frame" id="right-frame">
             <canvas id="right-canvas" hidden></canvas>
@@ -147,7 +153,8 @@
             choose Copy or Delete. On the other photo, click the place you want, then
             right-click and choose Paste. The piece is placed with its center on that point.
             Right-click the pasted piece and choose Enlarge or Shrink. Each step changes the
-            size by a quarter, and the piece stays centered.
+            size by a quarter, and the piece stays centered. Press Save to download that photo
+            with the changes.
           </p>
         </article>
       </section>
@@ -206,6 +213,6 @@
     <input id="right-file" type="file" accept="image/*" hidden />
 
     <script src="js/prism-bg.js"></script>
-    <script src="js/app.js?v=resize"></script>
+    <script src="js/app.js?v=save"></script>
   </body>
 </html>

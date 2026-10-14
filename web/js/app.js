@@ -14,6 +14,7 @@ const panes = [
     frame: "left-frame",
     canvas: "left-canvas",
     placeholder: "left-placeholder",
+    save: "left-save",
     button: "left-open",
     input: "left-file",
     status: "left-status",
@@ -23,6 +24,7 @@ const panes = [
     frame: "right-frame",
     canvas: "right-canvas",
     placeholder: "right-placeholder",
+    save: "right-save",
     button: "right-open",
     input: "right-file",
     status: "right-status",
@@ -35,6 +37,7 @@ const panes = [
   point: null,
   hover: null,
   splitting: false,
+  fileName: "",
   token: 0,
 }));
 
@@ -355,6 +358,26 @@ function resizePiece(state, factor) {
   state.node.status.textContent = factor > 1 ? "Enlarged." : "Shrunk.";
 }
 
+function savePane(state) {
+  if (!state.base) {
+    return;
+  }
+  const stem = (state.fileName || "image").replace(/\.[^.]+$/, "") || "image";
+  state.base.toBlob((blob) => {
+    if (!blob) {
+      state.node.status.textContent = "Could not save this image.";
+      return;
+    }
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${stem}.png`;
+    link.click();
+    URL.revokeObjectURL(url);
+    state.node.status.textContent = "Saved.";
+  }, "image/png");
+}
+
 function pastePiece(state, point) {
   if (!clipboard || !state.base) {
     return;
@@ -400,9 +423,11 @@ function openPhoto(state, file) {
         bitmap.close();
       }
       state.base = rememberBase(canvas);
+      state.fileName = file.name || "";
       state.pieces = [];
       state.point = null;
       state.hover = null;
+      state.node.save.disabled = false;
       showCanvas(canvas, state.node.placeholder);
       splitPane(state);
     })
@@ -417,11 +442,13 @@ function bindPane(state) {
   const frame = document.getElementById(state.frame);
   const canvas = document.getElementById(state.canvas);
   const placeholder = document.getElementById(state.placeholder);
+  const save = document.getElementById(state.save);
   const button = document.getElementById(state.button);
   const input = document.getElementById(state.input);
   const status = document.getElementById(state.status);
-  state.node = { frame, canvas, placeholder, button, input, status };
+  state.node = { frame, canvas, placeholder, save, button, input, status };
 
+  save.addEventListener("click", () => savePane(state));
   button.addEventListener("click", () => input.click());
   input.addEventListener("change", (event) => {
     const file = event.target.files && event.target.files[0];
