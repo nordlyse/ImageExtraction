@@ -6,6 +6,8 @@ const pasteButton = document.getElementById("paste-piece");
 const moveButton = document.getElementById("move-piece");
 const enlargeButton = document.getElementById("enlarge-piece");
 const shrinkButton = document.getElementById("shrink-piece");
+const rotateLeftButton = document.getElementById("rotate-left");
+const rotateRightButton = document.getElementById("rotate-right");
 const deleteButton = document.getElementById("delete-piece");
 const THEME_KEY = "image-extraction-theme";
 
@@ -213,11 +215,13 @@ function showMenu(event, state, point) {
   moveButton.disabled = noPiece;
   enlargeButton.disabled = noPiece;
   shrinkButton.disabled = noPiece;
+  rotateLeftButton.disabled = noPiece;
+  rotateRightButton.disabled = noPiece;
   deleteButton.disabled = noPiece;
   if (noPiece) {
     state.node.status.textContent = state.splitting
-      ? "Still splitting. Copy, Move, Enlarge, Shrink, and Delete turn on when the piece count appears."
-      : "Right-click the object itself to copy, move, resize, or delete it.";
+      ? "Still splitting. Copy, Move, Enlarge, Shrink, Rotate, and Delete turn on when the piece count appears."
+      : "Right-click the object itself to copy, move, resize, rotate, or delete it.";
   }
   pieceMenu.hidden = false;
   const margin = 8;
@@ -331,40 +335,38 @@ function deletePiece(state) {
 }
 
 const RESIZE_STEP = 1.25;
+const TURN_STEP = 15;
 
-function resizePiece(state, factor) {
-  const piece = state.hover;
-  if (!piece || !state.base) {
-    return;
-  }
-  const width = Math.round(piece.width * factor);
-  const height = Math.round(piece.height * factor);
-  const limit = Math.max(state.node.canvas.width, state.node.canvas.height) * 3;
-  if (width < 8 || height < 8) {
-    state.node.status.textContent = "That piece is already small.";
-    return;
-  }
-  if (width > limit || height > limit) {
-    state.node.status.textContent = "That piece is already large.";
-    return;
-  }
+function renderPiece(source, sourceWidth, sourceHeight, angle, centerX, centerY) {
+  const radians = (angle * Math.PI) / 180;
+  const sin = Math.abs(Math.sin(radians));
+  const cos = Math.abs(Math.cos(radians));
+  const width = Math.max(1, Math.ceil(sourceWidth * cos + sourceHeight * sin));
+  const height = Math.max(1, Math.ceil(sourceWidth * sin + sourceHeight * cos));
   const scratch = document.createElement("canvas");
   scratch.width = width;
   scratch.height = height;
-  const scratchCtx = scratch.getContext("2d");
-  scratchCtx.imageSmoothingEnabled = true;
-  scratchCtx.drawImage(piece.image, 0, 0, width, height);
-  const x = Math.round(piece.x + piece.width / 2 - width / 2);
-  const y = Math.round(piece.y + piece.height / 2 - height / 2);
-  const next = {
-    x,
-    y,
+  const ctx = scratch.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.translate(width / 2, height / 2);
+  ctx.rotate(radians);
+  ctx.drawImage(source, -sourceWidth / 2, -sourceHeight / 2, sourceWidth, sourceHeight);
+  return {
+    x: Math.round(centerX - width / 2),
+    y: Math.round(centerY - height / 2),
     width,
     height,
     image: scratch,
-    data: scratchCtx.getImageData(0, 0, width, height).data,
+    data: ctx.getImageData(0, 0, width, height).data,
     floating: true,
+    source,
+    sourceWidth,
+    sourceHeight,
+    angle,
   };
+}
+
+function placeNext(state, piece, next) {
   if (piece.floating) {
     const index = state.pieces.indexOf(piece);
     if (index >= 0) {
@@ -378,12 +380,72 @@ function resizePiece(state, factor) {
     if (state.moving === piece) {
       state.moving = next;
     }
+    if (drag && drag.piece === piece) {
+      drag.piece = next;
+    }
   } else {
     state.pieces.push(next);
   }
   state.hover = next;
   paintView(state);
+}
+
+function resizePiece(state, factor) {
+  const piece = state.hover;
+  if (!piece || !state.base) {
+    return;
+  }
+  const source = piece.source || piece.image;
+  const sourceWidth = Math.round((piece.sourceWidth || piece.width) * factor);
+  const sourceHeight = Math.round((piece.sourceHeight || piece.height) * factor);
+  const limit = Math.max(state.node.canvas.width, state.node.canvas.height) * 3;
+  if (sourceWidth < 8 || sourceHeight < 8) {
+    state.node.status.textContent = "That piece is already small.";
+    return;
+  }
+  if (sourceWidth > limit || sourceHeight > limit) {
+    state.node.status.textContent = "That piece is already large.";
+    return;
+  }
+  const next = renderPiece(
+    source,
+    sourceWidth,
+    sourceHeight,
+    piece.angle || 0,
+    piece.x + piece.width / 2,
+    piece.y + piece.height / 2
+  );
+  placeNext(state, piece, next);
   state.node.status.textContent = factor > 1 ? "Enlarged." : "Shrunk.";
+}
+
+function turnPiece(state, delta) {
+  const piece = state.hover;
+  if (!piece || !state.base) {
+    return;
+  }
+  const source = piece.source || piece.image;
+  const sourceWidth = piece.sourceWidth || piece.width;
+  const sourceHeight = piece.sourceHeight || piece.height;
+  let angle = ((piece.angle || 0) + delta) % 360;
+  if (angle < 0) {
+    angle += 360;
+  }
+  const next = renderPiece(
+    source,
+    sourceWidth,
+    sourceHeight,
+    angle,
+    piece.x + piece.width / 2,
+    piece.y + piece.height / 2
+  );
+  const limit = Math.max(state.node.canvas.width, state.node.canvas.height) * 3;
+  if (next.width > limit || next.height > limit) {
+    state.node.status.textContent = "That piece is already large.";
+    return;
+  }
+  placeNext(state, piece, next);
+  state.node.status.textContent = "Rotated.";
 }
 
 function savePane(state) {
@@ -683,6 +745,18 @@ function startApp() {
       return;
     }
     resizePiece(menuPane, 1 / RESIZE_STEP);
+  });
+  rotateLeftButton.addEventListener("click", () => {
+    if (!menuPane || !menuPane.hover) {
+      return;
+    }
+    turnPiece(menuPane, -TURN_STEP);
+  });
+  rotateRightButton.addEventListener("click", () => {
+    if (!menuPane || !menuPane.hover) {
+      return;
+    }
+    turnPiece(menuPane, TURN_STEP);
   });
   deleteButton.addEventListener("click", () => {
     if (!menuPane || !menuPane.hover) {
