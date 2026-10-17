@@ -463,8 +463,25 @@ function savePane(state) {
       flatCtx.drawImage(piece.image, piece.x, piece.y);
     }
   }
-  flat.toBlob((blob) => {
+  flat.toBlob(async (blob) => {
     if (!blob) {
+      state.node.status.textContent = "Could not save this image.";
+      return;
+    }
+    try {
+      const response = await fetch("/api/images", {
+        method: "POST",
+        headers: {
+          "Content-Type": "image/png",
+          "X-Image-Name": `${stem}.png`,
+        },
+        body: blob,
+      });
+      if (!response.ok) {
+        state.node.status.textContent = "Could not save this image.";
+        return;
+      }
+    } catch (error) {
       state.node.status.textContent = "Could not save this image.";
       return;
     }

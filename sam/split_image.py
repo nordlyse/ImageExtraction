@@ -14,6 +14,7 @@ from transformers import pipeline
 MODEL = "facebook/sam2.1-hiera-small"
 IN_DIR = Path("/images/in")
 OUT_DIR = Path("/images/out")
+SAVED_DIR = Path("/images/saved")
 SUFFIXES = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tif", ".tiff"}
 LOCK = threading.Lock()
 GENERATOR = None
@@ -146,20 +147,98 @@ def watch_folder():
         time.sleep(2)
 
 
+def safe_stem(name):
+    stem = Path(name or "image").stem
+    cleaned = "".join(ch if ch.isalnum() or ch in "-_" else "-" for ch in stem).strip("-")
+    return cleaned or "image"
+
+
+def saved_file(image_id):
+    if not image_id or "/" in image_id or "\\" in image_id or image_id in {".", ".."}:
+        return None
+    if not image_id.endswith(".png"):
+        return None
+    if not all(ch.isalnum() or ch in "-_." for ch in image_id):
+        return None
+    path = (SAVED_DIR / image_id).resolve()
+    if SAVED_DIR.resolve() not in path.parents:
+        return None
+    return path
+
+
+def list_saved_images():
+    if not SAVED_DIR.is_dir():
+        return []
+    images = []
+    for path in SAVED_DIR.iterdir():
+        if not path.is_file() or path.suffix.lower() != ".png":
+            continue
+        stat = path.stat()
+        images.append(
+            {
+                "id": path.name,
+                "name": path.name,
+                "bytes": stat.st_size,
+                "savedAt": int(stat.st_mtime),
+            }
+        )
+    images.sort(key=lambda item: item["savedAt"], reverse=True)
+    return images
+
+
+def add_saved_image(name, raw):
+    SAVED_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = time.strftime("%Y%m%dT%H%M%S")
+    image_id = f"{safe_stem(name)}-{stamp}-{time.time_ns() % 1000:03d}.png"
+    path = SAVED_DIR / image_id
+    Image.open(io.BytesIO(raw)).convert("RGBA").save(path, format="PNG")
+    return image_id
+
+
 class SegmentHandler(BaseHTTPRequestHandler):
-    def do_GET(self):
-        if self.path.split("?", 1)[0] != "/health":
-            self.send_error(404)
-            return
-        body = b"ok\n"
-        self.send_response(200)
-        self.send_header("Content-Type", "text/plain; charset=utf-8")
+    def send_body(self, status, body, content_type):
+        self.send_response(status)
+        self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.end_headers()
         self.wfile.write(body)
 
+    def do_GET(self):
+        path = self.path.split("?", 1)[0]
+        if path == "/health":
+            self.send_body(200, b"ok\n", "text/plain; charset=utf-8")
+            return
+        if path == "/images":
+            payload = json.dumps({"images": list_saved_images()}).encode("utf-8")
+            self.send_body(200, payload, "application/json")
+            return
+        if path.startswith("/images/"):
+            image_path = saved_file(path[len("/images/") :])
+            if image_path is None or not image_path.is_file():
+                self.send_error(404)
+                return
+            self.send_body(200, image_path.read_bytes(), "image/png")
+            return
+        self.send_error(404)
+
     def do_POST(self):
-        if self.path.split("?", 1)[0] != "/segment":
+        path = self.path.split("?", 1)[0]
+        if path == "/images":
+            length = int(self.headers.get("Content-Length", "0") or "0")
+            if length <= 0 or length > 25_000_000:
+                self.send_error(400, "Image body is missing or too large")
+                return
+            raw = self.rfile.read(length)
+            try:
+                image_id = add_saved_image(self.headers.get("X-Image-Name", "image.png"), raw)
+            except Exception as error:
+                print(f"Could not store image: {error}", flush=True)
+                self.send_error(400, "Image body is not a picture")
+                return
+            payload = json.dumps({"id": image_id, "name": image_id}).encode("utf-8")
+            self.send_body(200, payload, "application/json")
+            return
+        if path != "/segment":
             self.send_error(404)
             return
         if GENERATOR is None:
@@ -194,6 +273,7 @@ def main():
     global GENERATOR
     IN_DIR.mkdir(parents=True, exist_ok=True)
     OUT_DIR.mkdir(parents=True, exist_ok=True)
+    SAVED_DIR.mkdir(parents=True, exist_ok=True)
     device = 0 if torch.cuda.is_available() else -1
     print(f"Loading {MODEL}", flush=True)
     GENERATOR = pipeline("mask-generation", model=MODEL, device=device)
